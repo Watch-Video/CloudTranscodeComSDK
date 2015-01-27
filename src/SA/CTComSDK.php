@@ -42,13 +42,13 @@ class CTComSDK {
                 throw new \Exception("Set 'AWS_DEFAULT_REGION' environment variable!");
             }
         }
+
         $this->region = $region;
         $this->debug = $debug;
+
         // Create AWS SDK instance
         $this->aws = Aws::factory(array(
-                    'key' => $key,
-                    'secret' => $secret,
-                    'region' => $region,
+                    'region' => $region
         ));
         $this->sts = $this->aws->get('Sts');
         $this->sqs = $this->aws->get('Sqs');
@@ -69,19 +69,22 @@ class CTComSDK {
                     "DEBUG", "Polling from '$queue' ..."
             );
         }
-        // Poll from SQS to check for new message 
+
+        // Poll from SQS to check for new message
         $result = $this->sqs->receiveMessage(array(
             'QueueUrl' => $queue,
             'WaitTimeSeconds' => $timeout,
         ));
 
         // Get the message if any and return it to the caller
-        if (($messages = $result->get('Messages')) && count($messages)) {
+        if (($messages = $result->get('Messages')) &&
+                count($messages)) {
             if ($this->debug) {
                 $this->log_out(
                         "DEBUG", "New messages recieved in queue: '$queue'"
                 );
             }
+
             return $messages[0];
         }
     }
@@ -174,6 +177,7 @@ class CTComSDK {
             'activity' => $activity
                 )
         );
+
         $this->sqs->sendMessage(array(
             'QueueUrl' => $client->{'queues'}->{'output'},
             'MessageBody' => json_encode($msg),
@@ -212,6 +216,7 @@ class CTComSDK {
         if (!$input) {
             throw new \Exception("You must provide a JSON 'input' to start a new job!");
         }
+
         if (!($decodedClient = json_decode($client))) {
             throw new \Exception("Invalid JSON 'client' to start new job!");
         }
@@ -230,6 +235,7 @@ class CTComSDK {
             'QueueUrl' => $decodedClient->{'queues'}->{'input'},
             'MessageBody' => json_encode($msg),
         ));
+
         return ($job_id);
     }
 
@@ -263,6 +269,7 @@ class CTComSDK {
             'job_id' => $jobId,
             'data' => $data
         );
+
         return $msg;
     }
 
@@ -271,7 +278,7 @@ class CTComSDK {
         if (!($input = json_decode($task->get('input')))) {
             throw new \Exception("Task input JSON is invalid!");
         }
-        #trigger_error(print_r($input, 1));
+
         $job_id = $input->{"job_id"};
         $client = $input->{"client"};
 
@@ -288,11 +295,9 @@ class CTComSDK {
             if ($activityType["name"] == self::VALIDATE_INPUT) {
                 $activity['input'] = $input->{"data"};
             } else if ($activityType["name"] == self::TRANSCODE_ASSET) {
-                if (!$input->{"input_json"}->{"publishingVideo"}) {
-                    $activity['input']['input_asset_type'] = $input->{"input_asset_type"};
-                    $activity['input']['input_asset_info'] = $input->{"input_asset_info"};
-                    $activity['input']['output'] = $input->{"output"};
-                }
+                $activity['input']['input_asset_type'] = $input->{"input_asset_type"};
+                $activity['input']['input_asset_info'] = $input->{"input_asset_info"};
+                $activity['input']['output'] = $input->{"output"};
             }
         }
 
@@ -302,6 +307,7 @@ class CTComSDK {
                 $activity[$key] = $value;
             }
         }
+
         // Prepare data to be send out to client
         $data = array(
             'workflow' => $task->get('workflowExecution'),
@@ -311,6 +317,7 @@ class CTComSDK {
         $msg = $this->craft_new_msg(
                 $type, $job_id, $data
         );
+
         $this->sqs->sendMessage(array(
             'QueueUrl' => $client->{'queues'}->{'output'},
             'MessageBody' => json_encode($msg),
@@ -323,6 +330,7 @@ class CTComSDK {
 
         $job_id = $workflowInput->{"job_id"};
         $client = $workflowInput->{"client"};
+
         if ($sendInput) {
             $workflowExecution['input'] = $workflowInput->{"data"};
         }
@@ -336,9 +344,11 @@ class CTComSDK {
                 $data[$key] = $value;
             }
         }
+
         $msg = $this->craft_new_msg(
                 $type, $workflowInput->{'job_id'}, $data
         );
+
         $this->sqs->sendMessage(array(
             'QueueUrl' => $client->{'queues'}->{'output'},
             'MessageBody' => json_encode($msg),
